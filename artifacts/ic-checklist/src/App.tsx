@@ -18,7 +18,7 @@ function saveSession(data: object) {
 }
 
 const REPORTS_KEY = "ic-weekly-reports";
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const SEVEN_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 interface SavedReport {
   id: string;
@@ -608,21 +608,71 @@ export default function App() {
       )
       .join("");
 
+    const generatedAt = new Date();
+    const generatedDateStr = generatedAt.toLocaleDateString(undefined, {
+      weekday: "long", year: "numeric", month: "long", day: "numeric"
+    });
+    const generatedTimeStr = generatedAt.toLocaleTimeString(undefined, {
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
+    const reportId = `IC-${generatedAt.getFullYear()}${String(generatedAt.getMonth()+1).padStart(2,"0")}${String(generatedAt.getDate()).padStart(2,"0")}-${String(generatedAt.getHours()).padStart(2,"0")}${String(generatedAt.getMinutes()).padStart(2,"0")}`;
+
     return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
 <style>
   body{font-family:Arial,sans-serif;margin:32px;color:#1a1a2e;font-size:13px}
   h2{color:#1a1a2e;border-bottom:2px solid #1a1a2e;padding-bottom:5px;margin-top:24px;font-size:14px}
   table{border-collapse:collapse;width:100%;margin-top:8px}
   th{background:#1a1a2e;color:white;padding:9px 10px;text-align:left;font-size:11px}
+  .meta-table td{padding:4px 10px 4px 0;font-size:12px;border:none;vertical-align:top}
+  .meta-label{color:#888;font-size:11px;font-weight:bold;white-space:nowrap}
   @media print{body{margin:16px}.no-print{display:none}}
 </style></head><body>
-<div style="text-align:center;border-bottom:3px solid #1a1a2e;padding-bottom:14px;margin-bottom:20px">
-  <div style="font-size:10px;color:#888;letter-spacing:2px;text-transform:uppercase">Hospital Infection Control Department</div>
-  <div style="font-size:22px;font-weight:bold;margin:5px 0">WEEKLY ROUND REPORT</div>
-  <div style="font-size:10px;color:#888">JCI & CBAHI Aligned | CONFIDENTIAL</div>
-  <div style="font-size:12px;color:#555;margin-top:6px">
-    <strong>Date:</strong> ${roundDate} &nbsp;|&nbsp; <strong>Auditor:</strong> ${auditorName || "_______________"}
+
+<!-- Official Header -->
+<div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1a1a2e;padding-bottom:14px;margin-bottom:4px">
+  <div>
+    <div style="font-size:9px;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Hospital Infection Control Department</div>
+    <div style="font-size:24px;font-weight:bold;color:#1a1a2e;letter-spacing:0.5px">IC WEEKLY ROUND REPORT</div>
+    <div style="font-size:10px;color:#888;margin-top:3px">JCI & CBAHI Aligned &nbsp;|&nbsp; CONFIDENTIAL &nbsp;|&nbsp; Not for Distribution</div>
   </div>
+  <div style="text-align:right">
+    <div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:1px">Report ID</div>
+    <div style="font-size:13px;font-weight:bold;color:#1a1a2e;font-family:monospace">${reportId}</div>
+  </div>
+</div>
+
+<!-- Report Meta Table -->
+<div style="display:flex;gap:40px;margin:12px 0 20px;padding:10px 14px;background:#f7f8fa;border-radius:6px;border:1px solid #e5e7eb">
+  <table class="meta-table">
+    <tr>
+      <td class="meta-label">Round Date:</td>
+      <td style="font-weight:bold;font-size:13px">${roundDate}</td>
+    </tr>
+    <tr>
+      <td class="meta-label">Auditor Name:</td>
+      <td style="font-weight:bold;font-size:13px">${auditorName || "___________________________"}</td>
+    </tr>
+  </table>
+  <table class="meta-table">
+    <tr>
+      <td class="meta-label">Date Generated:</td>
+      <td style="font-size:12px">${generatedDateStr}</td>
+    </tr>
+    <tr>
+      <td class="meta-label">Time Generated:</td>
+      <td style="font-size:12px">${generatedTimeStr}</td>
+    </tr>
+  </table>
+  <table class="meta-table" style="margin-left:auto">
+    <tr>
+      <td class="meta-label">Status:</td>
+      <td><span style="background:#1a1a2e;color:white;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:bold">OFFICIAL</span></td>
+    </tr>
+    <tr>
+      <td class="meta-label">Classification:</td>
+      <td><span style="background:#c0392b;color:white;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:bold">CONFIDENTIAL</span></td>
+    </tr>
+  </table>
 </div>
 ${
   score !== null
@@ -1209,7 +1259,7 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
                 📂 Saved Reports
               </div>
               <div style={{ fontSize: 11, color: "#888" }}>
-                Reports are automatically kept for 7 days, then deleted. Export
+                Reports are automatically kept for 30 days (1 month), then deleted. Export
                 as PDF before they expire.
               </div>
             </div>
@@ -1638,7 +1688,7 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
                 textAlign: "center",
               }}
             >
-              Reports older than 7 days are automatically deleted to save
+              Reports older than 30 days (1 month) are automatically deleted to save
               space. Export important reports as PDF to keep them permanently.
             </div>
           </div>
