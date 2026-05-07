@@ -6,7 +6,7 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 const rawPort = process.env.PORT;
 
-
+base: "/",
 
 const basePath = process.env.BASE_PATH;
 
