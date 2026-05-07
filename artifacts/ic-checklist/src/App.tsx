@@ -26,6 +26,7 @@ interface SavedReport {
   roundDate: string;
   auditorName: string;
   overallScore: number | null;
+  areaScores: Partial<Record<string, number | null>>;
   reportHTML: string;
 }
 
@@ -477,6 +478,7 @@ export default function App() {
       roundDate,
       auditorName,
       overallScore: os,
+      areaScores: Object.fromEntries(AREAS.map((a) => [a, calcScore(a)])),
       reportHTML: html,
     };
     const updated = [newReport, ...loadReports()];
@@ -1417,15 +1419,13 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
                 </div>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {savedReports.map((r) => {
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {savedReports.map((r, rIdx) => {
                   const daysLeft = Math.ceil(
                     (r.savedAt + SEVEN_DAYS_MS - Date.now()) / (1000 * 60 * 60 * 24)
                   );
                   const scoreColor =
-                    r.overallScore !== null
-                      ? getRiskColor(r.overallScore)
-                      : "#aaa";
+                    r.overallScore !== null ? getRiskColor(r.overallScore) : "#aaa";
                   const savedDate = new Date(r.savedAt);
                   const savedDateStr = savedDate.toLocaleDateString(undefined, {
                     weekday: "short",
@@ -1437,6 +1437,9 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
                     hour: "2-digit",
                     minute: "2-digit",
                   });
+                  // Previous report is older = higher index (list is newest-first)
+                  const prevReport = savedReports[rIdx + 1] ?? null;
+
                   return (
                     <div
                       key={r.id}
@@ -1444,125 +1447,180 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
                         border: `2px solid ${scoreColor}30`,
                         borderLeft: `4px solid ${scoreColor}`,
                         borderRadius: 8,
-                        padding: "14px 16px",
                         background: "#fafafa",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 14,
-                        flexWrap: "wrap",
+                        overflow: "hidden",
                       }}
                     >
-                      {/* Score badge */}
-                      <div
-                        style={{
-                          background: scoreColor,
-                          color: "white",
-                          borderRadius: 8,
-                          padding: "6px 12px",
-                          textAlign: "center",
-                          minWidth: 64,
-                          flexShrink: 0,
-                        }}
-                      >
-                        <div
-                          style={{ fontSize: 20, fontWeight: "bold", lineHeight: 1 }}
-                        >
-                          {r.overallScore !== null ? `${r.overallScore}%` : "—"}
-                        </div>
-                        <div style={{ fontSize: 9, opacity: 0.85 }}>
-                          {r.overallScore !== null
-                            ? getRiskLabel(r.overallScore)
-                            : "NO DATA"}
-                        </div>
-                      </div>
-
-                      {/* Info */}
-                      <div style={{ flex: 1, minWidth: 160 }}>
+                      {/* Top row */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", flexWrap: "wrap" }}>
+                        {/* Score badge */}
                         <div
                           style={{
-                            fontWeight: "bold",
-                            fontSize: 13,
-                            color: "#1a1a2e",
-                          }}
-                        >
-                          Round Date:{" "}
-                          <span style={{ color: "#333" }}>{r.roundDate}</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
-                          Auditor:{" "}
-                          <strong>{r.auditorName || "—"}</strong>
-                        </div>
-                        <div style={{ fontSize: 10, color: "#999", marginTop: 3 }}>
-                          Saved: {savedDateStr} at {savedTimeStr}
-                        </div>
-                      </div>
-
-                      {/* Expiry */}
-                      <div
-                        style={{
-                          fontSize: 10,
-                          fontWeight: "bold",
-                          color: daysLeft <= 2 ? "#c0392b" : "#888",
-                          textAlign: "center",
-                          minWidth: 60,
-                        }}
-                      >
-                        <div style={{ fontSize: 18 }}>
-                          {daysLeft <= 2 ? "⚠️" : "🕐"}
-                        </div>
-                        Expires in
-                        <br />
-                        <span
-                          style={{
-                            color: daysLeft <= 2 ? "#c0392b" : "#555",
-                            fontSize: 12,
-                          }}
-                        >
-                          {daysLeft}d
-                        </span>
-                      </div>
-
-                      {/* Actions */}
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                          flexShrink: 0,
-                        }}
-                      >
-                        <button
-                          onClick={() => exportReportPDF(r.reportHTML)}
-                          style={{
-                            padding: "7px 14px",
-                            background: "#c0392b",
+                            background: scoreColor,
                             color: "white",
-                            border: "none",
-                            borderRadius: 6,
-                            cursor: "pointer",
-                            fontWeight: "bold",
-                            fontSize: 12,
-                            whiteSpace: "nowrap",
+                            borderRadius: 8,
+                            padding: "6px 12px",
+                            textAlign: "center",
+                            minWidth: 64,
+                            flexShrink: 0,
                           }}
                         >
-                          🖨️ Export PDF
-                        </button>
-                        <button
-                          onClick={() => deleteReport(r.id)}
+                          <div style={{ fontSize: 20, fontWeight: "bold", lineHeight: 1 }}>
+                            {r.overallScore !== null ? `${r.overallScore}%` : "—"}
+                          </div>
+                          <div style={{ fontSize: 9, opacity: 0.85 }}>
+                            {r.overallScore !== null ? getRiskLabel(r.overallScore) : "NO DATA"}
+                          </div>
+                        </div>
+
+                        {/* Info */}
+                        <div style={{ flex: 1, minWidth: 160 }}>
+                          <div style={{ fontWeight: "bold", fontSize: 13, color: "#1a1a2e" }}>
+                            Round Date: <span style={{ color: "#333" }}>{r.roundDate}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
+                            Auditor: <strong>{r.auditorName || "—"}</strong>
+                          </div>
+                          <div style={{ fontSize: 10, color: "#999", marginTop: 3 }}>
+                            Saved: {savedDateStr} at {savedTimeStr}
+                          </div>
+                        </div>
+
+                        {/* Expiry */}
+                        <div
                           style={{
-                            padding: "5px 14px",
-                            background: "white",
-                            color: "#c0392b",
-                            border: "1px solid #c0392b",
-                            borderRadius: 6,
-                            cursor: "pointer",
-                            fontSize: 11,
-                            whiteSpace: "nowrap",
+                            fontSize: 10,
+                            fontWeight: "bold",
+                            color: daysLeft <= 2 ? "#c0392b" : "#888",
+                            textAlign: "center",
+                            minWidth: 60,
                           }}
                         >
-                          🗑️ Delete
-                        </button>
+                          <div style={{ fontSize: 18 }}>{daysLeft <= 2 ? "⚠️" : "🕐"}</div>
+                          Expires in<br />
+                          <span style={{ color: daysLeft <= 2 ? "#c0392b" : "#555", fontSize: 12 }}>
+                            {daysLeft}d
+                          </span>
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+                          <button
+                            onClick={() => exportReportPDF(r.reportHTML)}
+                            style={{
+                              padding: "7px 14px",
+                              background: "#c0392b",
+                              color: "white",
+                              border: "none",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              fontWeight: "bold",
+                              fontSize: 12,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            🖨️ Export PDF
+                          </button>
+                          <button
+                            onClick={() => deleteReport(r.id)}
+                            style={{
+                              padding: "5px 14px",
+                              background: "white",
+                              color: "#c0392b",
+                              border: "1px solid #c0392b",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              fontSize: 11,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Per-area breakdown strip */}
+                      {r.areaScores && (
+                        <div
+                          style={{
+                            borderTop: `1px solid ${scoreColor}20`,
+                            background: "white",
+                            padding: "10px 16px",
+                            display: "flex",
+                            gap: 6,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ fontSize: 10, color: "#aaa", fontWeight: "bold", alignSelf: "center", marginRight: 4 }}>
+                            AREAS:
+                          </div>
+                          {AREAS.map((a) => {
+                            const score = r.areaScores?.[a] ?? null;
+                            const prevScore = prevReport?.areaScores?.[a] ?? null;
+                            const color = score !== null ? getRiskColor(score) : "#ccc";
+
+                            let trendIcon = "";
+                            let trendColor = "#aaa";
+                            if (score !== null && prevScore !== null) {
+                              const diff = score - prevScore;
+                              if (diff > 0) { trendIcon = "↑"; trendColor = "#27ae60"; }
+                              else if (diff < 0) { trendIcon = "↓"; trendColor = "#c0392b"; }
+                              else { trendIcon = "="; trendColor = "#aaa"; }
+                            }
+
+                            return (
+                              <div
+                                key={a}
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  background: `${color}12`,
+                                  border: `1.5px solid ${color}40`,
+                                  borderRadius: 6,
+                                  padding: "4px 8px",
+                                  minWidth: 52,
+                                  position: "relative",
+                                }}
+                              >
+                                <div style={{ fontSize: 10, color: "#555", fontWeight: "bold" }}>
+                                  {CHECKLISTS[a].icon} {a}
+                                </div>
+                                <div style={{ fontSize: 13, fontWeight: "bold", color, lineHeight: 1.2 }}>
+                                  {score !== null ? `${score}%` : "—"}
+                                </div>
+                                {trendIcon && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: -7,
+                                      right: -5,
+                                      fontSize: 11,
+                                      fontWeight: "bold",
+                                      color: trendColor,
+                                      background: "white",
+                                      borderRadius: "50%",
+                                      width: 16,
+                                      height: 16,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                                    }}
+                                  >
+                                    {trendIcon}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {prevReport && (
+                            <div style={{ fontSize: 9, color: "#bbb", alignSelf: "flex-end", marginLeft: "auto" }}>
+                              vs {prevReport.roundDate}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
