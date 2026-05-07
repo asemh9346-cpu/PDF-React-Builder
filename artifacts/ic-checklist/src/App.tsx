@@ -454,13 +454,17 @@ export default function App() {
   const [savedToast, setSavedToast] = useState(false);
   const [showReportsList, setShowReportsList] = useState(false);
   const [savedReports, setSavedReports] = useState<SavedReport[]>(() => loadReports());
+  const [customItems, setCustomItems] = useState<Record<string, string[]>>(
+    saved?.customItems ?? {}
+  );
+  const [addItemInput, setAddItemInput] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    saveSession({ checks, auditorName, roundDate, observations, actionPlan });
+    saveSession({ checks, auditorName, roundDate, observations, actionPlan, customItems });
     setSavedToast(true);
     const t = setTimeout(() => setSavedToast(false), 1500);
     return () => clearTimeout(t);
-  }, [checks, auditorName, roundDate, observations, actionPlan]);
+  }, [checks, auditorName, roundDate, observations, actionPlan, customItems]);
 
   const clearSession = () => {
     localStorage.removeItem(STORAGE_KEY);
@@ -469,6 +473,7 @@ export default function App() {
     setRoundDate(new Date().toISOString().split("T")[0]);
     setObservations({});
     setActionPlan({});
+    setCustomItems({});
     setShowClearConfirm(false);
   };
 
@@ -514,47 +519,91 @@ export default function App() {
       [key(area, sec, idx)]: p[key(area, sec, idx)] === v ? undefined : v,
     }));
 
+  const customKey = (area: string, sec: string, idx: number) =>
+    `${area}||${sec}||c${idx}`;
+  const getCustomVal = (area: string, sec: string, idx: number): CheckValue | undefined =>
+    checks[customKey(area, sec, idx)];
+  const toggleCustom = (area: string, sec: string, idx: number, v: CheckValue) =>
+    setChecks((p) => ({
+      ...p,
+      [customKey(area, sec, idx)]: p[customKey(area, sec, idx)] === v ? undefined : v,
+    }));
+
+  const addCustomItem = (area: string, sec: string) => {
+    const k = `${area}||${sec}`;
+    const text = (addItemInput[k] || "").trim();
+    if (!text) return;
+    setCustomItems((p) => ({ ...p, [k]: [...(p[k] || []), text] }));
+    setAddItemInput((p) => ({ ...p, [k]: "" }));
+  };
+
+  const deleteCustomItem = (area: string, sec: string, idx: number) => {
+    const k = `${area}||${sec}`;
+    const oldArr = customItems[k] || [];
+    setCustomItems((p) => {
+      const arr = [...(p[k] || [])];
+      arr.splice(idx, 1);
+      return { ...p, [k]: arr };
+    });
+    setChecks((p) => {
+      const next = { ...p };
+      delete next[customKey(area, sec, idx)];
+      for (let i = idx + 1; i < oldArr.length; i++) {
+        const fromK = customKey(area, sec, i);
+        const toK = customKey(area, sec, i - 1);
+        if (next[fromK] !== undefined) next[toK] = next[fromK];
+        else delete next[toK];
+        delete next[fromK];
+      }
+      return next;
+    });
+  };
+
   const calcScore = (area: Area): number | null => {
-    let total = 0,
-      yes = 0;
-    CHECKLISTS[area].sections.forEach((s) =>
+    let total = 0, yes = 0;
+    CHECKLISTS[area].sections.forEach((s) => {
       s.items.forEach((_, i) => {
         const v = getVal(area, s.title, i);
-        if (v) {
-          total++;
-          if (v === "yes") yes++;
-        }
-      })
-    );
+        if (v) { total++; if (v === "yes") yes++; }
+      });
+      (customItems[`${area}||${s.title}`] || []).forEach((_, i) => {
+        const v = getCustomVal(area, s.title, i);
+        if (v) { total++; if (v === "yes") yes++; }
+      });
+    });
     return total === 0 ? null : Math.round((yes / total) * 100);
   };
 
   const getNonCompliant = (area: Area) => {
     const out: { area: Area; section: string; item: string }[] = [];
-    CHECKLISTS[area].sections.forEach((s) =>
+    CHECKLISTS[area].sections.forEach((s) => {
       s.items.forEach((item, i) => {
         if (getVal(area, s.title, i) === "no")
           out.push({ area, section: s.title, item });
-      })
-    );
+      });
+      (customItems[`${area}||${s.title}`] || []).forEach((item, i) => {
+        if (getCustomVal(area, s.title, i) === "no")
+          out.push({ area, section: s.title, item: `★ ${item}` });
+      });
+    });
     return out;
   };
 
   const allGaps = AREAS.flatMap(getNonCompliant);
 
   const overallScore = (): number | null => {
-    let total = 0,
-      yes = 0;
+    let total = 0, yes = 0;
     AREAS.forEach((a) =>
-      CHECKLISTS[a].sections.forEach((s) =>
+      CHECKLISTS[a].sections.forEach((s) => {
         s.items.forEach((_, i) => {
           const v = getVal(a, s.title, i);
-          if (v) {
-            total++;
-            if (v === "yes") yes++;
-          }
-        })
-      )
+          if (v) { total++; if (v === "yes") yes++; }
+        });
+        (customItems[`${a}||${s.title}`] || []).forEach((_, i) => {
+          const v = getCustomVal(a, s.title, i);
+          if (v) { total++; if (v === "yes") yes++; }
+        });
+      })
     );
     return total === 0 ? null : Math.round((yes / total) * 100);
   };
@@ -1158,6 +1207,75 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
                 </div>
               );
             })}
+            {/* Custom items */}
+            {(customItems[`${area}||${section.title}`] || []).map((item, idx) => {
+              const val = getCustomVal(area, section.title, idx);
+              return (
+                <div
+                  key={`c${idx}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "9px 14px",
+                    borderTop: "1px dashed #e0f0e8",
+                    background: val === "no" ? "#fff5f5" : "#f6fff9",
+                  }}
+                >
+                  <div style={{ flex: 1, fontSize: 12, color: "#333", lineHeight: 1.4 }}>
+                    {val === "no" && (
+                      <span style={{ fontSize: 9, fontWeight: "bold", color: "#c0392b", background: "#fde8e8", padding: "1px 4px", borderRadius: 3, marginRight: 5 }}>GAP</span>
+                    )}
+                    <span style={{ color: areaData.color, fontWeight: "bold", marginRight: 4, fontSize: 10 }}>★</span>
+                    {item}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    {(["yes", "no", "na"] as CheckValue[]).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => toggleCustom(area, section.title, idx, v)}
+                        style={{
+                          padding: "3px 8px",
+                          border: `1.5px solid ${v === "yes" ? "#27ae60" : v === "no" ? "#c0392b" : "#95a5a6"}`,
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          background: val === v ? (v === "yes" ? "#27ae60" : v === "no" ? "#c0392b" : "#95a5a6") : "white",
+                          color: val === v ? "white" : "#555",
+                          fontWeight: val === v ? "bold" : "normal",
+                          fontSize: 11,
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {v === "yes" ? "✓ Yes" : v === "no" ? "✗ No" : "N/A"}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => deleteCustomItem(area, section.title, idx)}
+                      title="Remove item"
+                      style={{ padding: "3px 8px", border: "1.5px solid #ddd", borderRadius: 4, cursor: "pointer", background: "white", color: "#c0392b", fontSize: 13, lineHeight: 1 }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {/* Add custom item row */}
+            <div style={{ display: "flex", gap: 6, padding: "7px 14px", borderTop: "1px dashed #e0e0e0", background: "#f9f9f9" }}>
+              <input
+                value={addItemInput[`${area}||${section.title}`] || ""}
+                onChange={(e) => setAddItemInput((p) => ({ ...p, [`${area}||${section.title}`]: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") addCustomItem(area, section.title); }}
+                placeholder="+ Type a custom audit item and press Enter or Add…"
+                style={{ flex: 1, padding: "4px 8px", fontSize: 11, border: "1px solid #ddd", borderRadius: 4, outline: "none", color: "#333", background: "white" }}
+              />
+              <button
+                onClick={() => addCustomItem(area, section.title)}
+                style={{ padding: "4px 12px", fontSize: 11, background: areaData.color, color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontWeight: "bold" }}
+              >
+                Add
+              </button>
+            </div>
           </div>
         ))}
 
