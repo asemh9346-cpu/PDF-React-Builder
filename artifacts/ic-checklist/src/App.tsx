@@ -17,6 +17,37 @@ function saveSession(data: object) {
   } catch {}
 }
 
+const REPORTS_KEY = "ic-weekly-reports";
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+interface SavedReport {
+  id: string;
+  savedAt: number;
+  roundDate: string;
+  auditorName: string;
+  overallScore: number | null;
+  reportHTML: string;
+}
+
+function loadReports(): SavedReport[] {
+  try {
+    const raw = localStorage.getItem(REPORTS_KEY);
+    const all: SavedReport[] = raw ? JSON.parse(raw) : [];
+    const cutoff = Date.now() - SEVEN_DAYS_MS;
+    return all.filter((r) => r.savedAt >= cutoff);
+  } catch {
+    return [];
+  }
+}
+
+function persistReports(reports: SavedReport[]) {
+  try {
+    const cutoff = Date.now() - SEVEN_DAYS_MS;
+    const pruned = reports.filter((r) => r.savedAt >= cutoff);
+    localStorage.setItem(REPORTS_KEY, JSON.stringify(pruned));
+  } catch {}
+}
+
 const AREAS = ["ICU", "NICU", "ER", "OR", "CSSD", "DR", "WARD"] as const;
 type Area = typeof AREAS[number];
 
@@ -418,6 +449,8 @@ export default function App() {
   const [exportMsg, setExportMsg] = useState("");
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
+  const [showReportsList, setShowReportsList] = useState(false);
+  const [savedReports, setSavedReports] = useState<SavedReport[]>(() => loadReports());
 
   useEffect(() => {
     saveSession({ checks, auditorName, roundDate, observations, actionPlan });
@@ -434,6 +467,37 @@ export default function App() {
     setObservations({});
     setActionPlan({});
     setShowClearConfirm(false);
+  };
+
+  const doSaveReport = (html: string) => {
+    const os = overallScore();
+    const newReport: SavedReport = {
+      id: Date.now().toString(),
+      savedAt: Date.now(),
+      roundDate,
+      auditorName,
+      overallScore: os,
+      reportHTML: html,
+    };
+    const updated = [newReport, ...loadReports()];
+    persistReports(updated);
+    setSavedReports(loadReports());
+  };
+
+  const deleteReport = (id: string) => {
+    const updated = savedReports.filter((r) => r.id !== id);
+    persistReports(updated);
+    setSavedReports(updated);
+  };
+
+  const exportReportPDF = (html: string) => {
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => { w.print(); w.close(); }, 600);
+    }
   };
 
   const key = (area: string, sec: string, idx: number) =>
@@ -734,7 +798,11 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
               }}
             />
             <button
-              onClick={() => setShowReport(true)}
+              onClick={() => {
+                const html = buildReportHTML();
+                doSaveReport(html);
+                setShowReport(true);
+              }}
               style={{
                 padding: "6px 14px",
                 borderRadius: 5,
@@ -747,6 +815,40 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
               }}
             >
               📋 Generate Report
+            </button>
+            <button
+              onClick={() => setShowReportsList(true)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 5,
+                background: "rgba(255,255,255,0.12)",
+                color: "white",
+                border: "1px solid rgba(255,255,255,0.25)",
+                cursor: "pointer",
+                fontSize: 12,
+                position: "relative",
+              }}
+            >
+              📂 Reports
+              {savedReports.length > 0 && (
+                <span style={{
+                  position: "absolute",
+                  top: -6,
+                  right: -6,
+                  background: "#f39c12",
+                  color: "white",
+                  borderRadius: "50%",
+                  width: 16,
+                  height: 16,
+                  fontSize: 10,
+                  fontWeight: "bold",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}>
+                  {savedReports.length}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setShowClearConfirm(true)}
@@ -1041,6 +1143,261 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
           />
         </div>
       </div>
+
+      {/* REPORTS LIST MODAL */}
+      {showReportsList && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.75)",
+            zIndex: 200,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            overflowY: "auto",
+            padding: "20px 10px",
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              maxWidth: 720,
+              width: "100%",
+              padding: 24,
+              position: "relative",
+            }}
+          >
+            <button
+              onClick={() => setShowReportsList(false)}
+              style={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                background: "#eee",
+                border: "none",
+                borderRadius: 20,
+                width: 30,
+                height: 30,
+                cursor: "pointer",
+                fontSize: 16,
+                fontWeight: "bold",
+              }}
+            >
+              ×
+            </button>
+
+            {/* Header */}
+            <div
+              style={{
+                borderBottom: "3px solid #1a1a2e",
+                paddingBottom: 12,
+                marginBottom: 20,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  color: "#1a1a2e",
+                  marginBottom: 3,
+                }}
+              >
+                📂 Saved Reports
+              </div>
+              <div style={{ fontSize: 11, color: "#888" }}>
+                Reports are automatically kept for 7 days, then deleted. Export
+                as PDF before they expire.
+              </div>
+            </div>
+
+            {savedReports.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px 20px",
+                  color: "#aaa",
+                }}
+              >
+                <div style={{ fontSize: 40, marginBottom: 10 }}>📋</div>
+                <div style={{ fontSize: 14, fontWeight: "bold" }}>
+                  No saved reports yet
+                </div>
+                <div style={{ fontSize: 12, marginTop: 6 }}>
+                  Click "Generate Report" to create and save your first report.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {savedReports.map((r) => {
+                  const daysLeft = Math.ceil(
+                    (r.savedAt + SEVEN_DAYS_MS - Date.now()) / (1000 * 60 * 60 * 24)
+                  );
+                  const scoreColor =
+                    r.overallScore !== null
+                      ? getRiskColor(r.overallScore)
+                      : "#aaa";
+                  const savedDate = new Date(r.savedAt);
+                  const savedDateStr = savedDate.toLocaleDateString(undefined, {
+                    weekday: "short",
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  });
+                  const savedTimeStr = savedDate.toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
+                  return (
+                    <div
+                      key={r.id}
+                      style={{
+                        border: `2px solid ${scoreColor}30`,
+                        borderLeft: `4px solid ${scoreColor}`,
+                        borderRadius: 8,
+                        padding: "14px 16px",
+                        background: "#fafafa",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {/* Score badge */}
+                      <div
+                        style={{
+                          background: scoreColor,
+                          color: "white",
+                          borderRadius: 8,
+                          padding: "6px 12px",
+                          textAlign: "center",
+                          minWidth: 64,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div
+                          style={{ fontSize: 20, fontWeight: "bold", lineHeight: 1 }}
+                        >
+                          {r.overallScore !== null ? `${r.overallScore}%` : "—"}
+                        </div>
+                        <div style={{ fontSize: 9, opacity: 0.85 }}>
+                          {r.overallScore !== null
+                            ? getRiskLabel(r.overallScore)
+                            : "NO DATA"}
+                        </div>
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ flex: 1, minWidth: 160 }}>
+                        <div
+                          style={{
+                            fontWeight: "bold",
+                            fontSize: 13,
+                            color: "#1a1a2e",
+                          }}
+                        >
+                          Round Date:{" "}
+                          <span style={{ color: "#333" }}>{r.roundDate}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
+                          Auditor:{" "}
+                          <strong>{r.auditorName || "—"}</strong>
+                        </div>
+                        <div style={{ fontSize: 10, color: "#999", marginTop: 3 }}>
+                          Saved: {savedDateStr} at {savedTimeStr}
+                        </div>
+                      </div>
+
+                      {/* Expiry */}
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: "bold",
+                          color: daysLeft <= 2 ? "#c0392b" : "#888",
+                          textAlign: "center",
+                          minWidth: 60,
+                        }}
+                      >
+                        <div style={{ fontSize: 18 }}>
+                          {daysLeft <= 2 ? "⚠️" : "🕐"}
+                        </div>
+                        Expires in
+                        <br />
+                        <span
+                          style={{
+                            color: daysLeft <= 2 ? "#c0392b" : "#555",
+                            fontSize: 12,
+                          }}
+                        >
+                          {daysLeft}d
+                        </span>
+                      </div>
+
+                      {/* Actions */}
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <button
+                          onClick={() => exportReportPDF(r.reportHTML)}
+                          style={{
+                            padding: "7px 14px",
+                            background: "#c0392b",
+                            color: "white",
+                            border: "none",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            fontWeight: "bold",
+                            fontSize: 12,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          🖨️ Export PDF
+                        </button>
+                        <button
+                          onClick={() => deleteReport(r.id)}
+                          style={{
+                            padding: "5px 14px",
+                            background: "white",
+                            color: "#c0392b",
+                            border: "1px solid #c0392b",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            fontSize: 11,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Footer note */}
+            <div
+              style={{
+                marginTop: 18,
+                paddingTop: 12,
+                borderTop: "1px solid #eee",
+                fontSize: 11,
+                color: "#aaa",
+                textAlign: "center",
+              }}
+            >
+              Reports older than 7 days are automatically deleted to save
+              space. Export important reports as PDF to keep them permanently.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NEW ROUND CONFIRM */}
       {showClearConfirm && (
