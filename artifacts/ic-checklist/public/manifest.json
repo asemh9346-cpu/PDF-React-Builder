@@ -1,0 +1,16 @@
+{
+  "name": "IC Weekly Round Checklist",
+  "short_name": "IC Checklist",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2966/2966486.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
