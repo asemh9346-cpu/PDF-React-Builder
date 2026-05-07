@@ -19,6 +19,8 @@ function saveSession(data: object) {
 
 const REPORTS_KEY = "ic-weekly-reports";
 const SEVEN_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const HOSPITAL_NAME = "SGH - Hia Aljamea";
+const HOSPITAL_DEPT = "Infection Control Department";
 
 interface SavedReport {
   id: string;
@@ -629,15 +631,23 @@ export default function App() {
 </style></head><body>
 
 <!-- Official Header -->
-<div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1a1a2e;padding-bottom:14px;margin-bottom:4px">
-  <div>
-    <div style="font-size:9px;color:#888;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Hospital Infection Control Department</div>
-    <div style="font-size:24px;font-weight:bold;color:#1a1a2e;letter-spacing:0.5px">IC WEEKLY ROUND REPORT</div>
-    <div style="font-size:10px;color:#888;margin-top:3px">JCI & CBAHI Aligned &nbsp;|&nbsp; CONFIDENTIAL &nbsp;|&nbsp; Not for Distribution</div>
-  </div>
-  <div style="text-align:right">
-    <div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:1px">Report ID</div>
-    <div style="font-size:13px;font-weight:bold;color:#1a1a2e;font-family:monospace">${reportId}</div>
+<div style="border-bottom:3px solid #1a1a2e;padding-bottom:14px;margin-bottom:4px">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between">
+    <div>
+      <div style="font-size:20px;font-weight:bold;color:#1a1a2e;letter-spacing:0.5px">SGH — Hia Aljamea</div>
+      <div style="font-size:12px;color:#555;font-weight:600;margin-top:2px">Infection Control Department</div>
+      <div style="font-size:9px;color:#888;letter-spacing:1.5px;text-transform:uppercase;margin-top:6px">IC WEEKLY ROUND REPORT</div>
+      <div style="font-size:10px;color:#aaa;margin-top:2px">JCI & CBAHI Aligned &nbsp;|&nbsp; CONFIDENTIAL &nbsp;|&nbsp; Not for Distribution</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:9px;color:#888;text-transform:uppercase;letter-spacing:1px">Report ID</div>
+      <div style="font-size:13px;font-weight:bold;color:#1a1a2e;font-family:monospace">${reportId}</div>
+      <div style="margin-top:6px">
+        <span style="background:#1a1a2e;color:white;padding:2px 7px;border-radius:3px;font-size:9px;font-weight:bold;letter-spacing:1px">OFFICIAL</span>
+        &nbsp;
+        <span style="background:#c0392b;color:white;padding:2px 7px;border-radius:3px;font-size:9px;font-weight:bold;letter-spacing:1px">CONFIDENTIAL</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -780,13 +790,14 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
           >
             <span style={{ fontSize: 22 }}>🛡️</span>
             <div>
-              <div style={{ fontWeight: "bold", fontSize: 15 }}>
-                IC WEEKLY ROUND CHECKLIST
+              <div style={{ fontWeight: "bold", fontSize: 16, letterSpacing: 0.3 }}>
+                {HOSPITAL_NAME}
               </div>
-              <div
-                style={{ fontSize: 10, opacity: 0.6, letterSpacing: 1 }}
-              >
-                JCI & CBAHI ALIGNED | HOSPITAL INFECTION CONTROL
+              <div style={{ fontSize: 11, opacity: 0.85, fontWeight: "600" }}>
+                {HOSPITAL_DEPT} — IC Weekly Round Checklist
+              </div>
+              <div style={{ fontSize: 9, opacity: 0.5, letterSpacing: 1, marginTop: 1 }}>
+                JCI & CBAHI ALIGNED | CONFIDENTIAL
               </div>
             </div>
             {os !== null && (
