@@ -6,7 +6,7 @@
   "background_color": "#1a1a2e",
   "theme_color": "#1a1a2e",
   "orientation": "portrait",
-  "icons": [
+  "icons": []
     {
       "src": "/2966486.png",
       "sizes": "512x512",
