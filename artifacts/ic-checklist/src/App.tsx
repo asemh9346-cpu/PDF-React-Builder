@@ -1212,6 +1212,194 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
               </div>
             </div>
 
+            {/* TREND CHART */}
+            {(() => {
+              const chartReports = [...savedReports]
+                .filter((r) => r.overallScore !== null)
+                .sort((a, b) => a.savedAt - b.savedAt);
+              if (chartReports.length < 1) return null;
+
+              const W = 600, H = 180;
+              const pad = { top: 24, right: 28, bottom: 44, left: 44 };
+              const cw = W - pad.left - pad.right;
+              const ch = H - pad.top - pad.bottom;
+
+              const toX = (i: number) =>
+                chartReports.length === 1
+                  ? pad.left + cw / 2
+                  : pad.left + (i / (chartReports.length - 1)) * cw;
+              const toY = (score: number) =>
+                pad.top + ch - (score / 100) * ch;
+
+              const linePoints = chartReports
+                .map((r, i) => `${toX(i)},${toY(r.overallScore!)}`)
+                .join(" ");
+              const areaPoints = [
+                `${toX(0)},${pad.top + ch}`,
+                ...chartReports.map((r, i) => `${toX(i)},${toY(r.overallScore!)}`),
+                `${toX(chartReports.length - 1)},${pad.top + ch}`,
+              ].join(" ");
+
+              const yTicks = [0, 60, 85, 100];
+
+              return (
+                <div
+                  style={{
+                    background: "#f8f9fb",
+                    border: "1px solid #e8eaed",
+                    borderRadius: 10,
+                    padding: "14px 16px 10px",
+                    marginBottom: 18,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: "bold",
+                      color: "#1a1a2e",
+                      marginBottom: 8,
+                    }}
+                  >
+                    📈 Compliance Score Trend
+                  </div>
+                  <svg
+                    viewBox={`0 0 ${W} ${H}`}
+                    style={{ width: "100%", height: "auto", display: "block" }}
+                  >
+                    {/* Zone backgrounds */}
+                    <rect x={pad.left} y={pad.top} width={cw} height={(ch * 15) / 100} fill="#e8f8f0" opacity="0.6" />
+                    <rect x={pad.left} y={pad.top + (ch * 15) / 100} width={cw} height={(ch * 25) / 100} fill="#fef5e7" opacity="0.6" />
+                    <rect x={pad.left} y={pad.top + (ch * 40) / 100} width={cw} height={(ch * 60) / 100} fill="#fdedec" opacity="0.6" />
+
+                    {/* Zone threshold lines */}
+                    {[85, 60].map((pct) => (
+                      <line
+                        key={pct}
+                        x1={pad.left} y1={toY(pct)}
+                        x2={pad.left + cw} y2={toY(pct)}
+                        stroke={pct === 85 ? "#27ae60" : "#e67e22"}
+                        strokeWidth="1"
+                        strokeDasharray="4 3"
+                        opacity="0.6"
+                      />
+                    ))}
+
+                    {/* Y-axis labels */}
+                    {yTicks.map((pct) => (
+                      <g key={pct}>
+                        <text
+                          x={pad.left - 6}
+                          y={toY(pct) + 4}
+                          textAnchor="end"
+                          fontSize="9"
+                          fill="#999"
+                        >
+                          {pct}%
+                        </text>
+                        <line
+                          x1={pad.left - 3} y1={toY(pct)}
+                          x2={pad.left} y2={toY(pct)}
+                          stroke="#ccc" strokeWidth="1"
+                        />
+                      </g>
+                    ))}
+
+                    {/* Area fill */}
+                    {chartReports.length > 1 && (
+                      <polygon points={areaPoints} fill="#3498db" opacity="0.08" />
+                    )}
+
+                    {/* Line */}
+                    {chartReports.length > 1 && (
+                      <polyline
+                        points={linePoints}
+                        fill="none"
+                        stroke="#2980b9"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    )}
+
+                    {/* Data points */}
+                    {chartReports.map((r, i) => {
+                      const x = toX(i);
+                      const y = toY(r.overallScore!);
+                      const color = getRiskColor(r.overallScore!);
+                      const label = r.roundDate.slice(5); // MM-DD
+                      return (
+                        <g key={r.id}>
+                          {/* Score label above dot */}
+                          <text
+                            x={x}
+                            y={y - 10}
+                            textAnchor="middle"
+                            fontSize="10"
+                            fontWeight="bold"
+                            fill={color}
+                          >
+                            {r.overallScore}%
+                          </text>
+                          {/* Dot */}
+                          <circle
+                            cx={x} cy={y} r="6"
+                            fill={color}
+                            stroke="white"
+                            strokeWidth="2"
+                          />
+                          {/* X-axis date label */}
+                          <text
+                            x={x}
+                            y={pad.top + ch + 16}
+                            textAnchor="middle"
+                            fontSize="9"
+                            fill="#777"
+                          >
+                            {label}
+                          </text>
+                          {/* Auditor sub-label */}
+                          <text
+                            x={x}
+                            y={pad.top + ch + 28}
+                            textAnchor="middle"
+                            fontSize="8"
+                            fill="#aaa"
+                          >
+                            {r.auditorName ? r.auditorName.split(" ")[0] : "—"}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* Y axis line */}
+                    <line
+                      x1={pad.left} y1={pad.top}
+                      x2={pad.left} y2={pad.top + ch}
+                      stroke="#ddd" strokeWidth="1"
+                    />
+                    {/* X axis line */}
+                    <line
+                      x1={pad.left} y1={pad.top + ch}
+                      x2={pad.left + cw} y2={pad.top + ch}
+                      stroke="#ddd" strokeWidth="1"
+                    />
+
+                    {/* Legend */}
+                    {[
+                      { color: "#27ae60", label: "≥85% Low Risk" },
+                      { color: "#e67e22", label: "60–84% Medium" },
+                      { color: "#c0392b", label: "<60% High Risk" },
+                    ].map((item, i) => (
+                      <g key={i} transform={`translate(${pad.left + i * 140}, ${H - 8})`}>
+                        <circle cx="5" cy="0" r="4" fill={item.color} />
+                        <text x="12" y="4" fontSize="8" fill="#888">{item.label}</text>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+              );
+            })()}
+
             {savedReports.length === 0 ? (
               <div
                 style={{
