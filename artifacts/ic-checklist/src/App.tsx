@@ -1,4 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const STORAGE_KEY = "ic-checklist-session";
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(data: object) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
 
 const AREAS = ["ICU", "NICU", "ER", "OR", "CSSD", "DR", "WARD"] as const;
 type Area = typeof AREAS[number];
@@ -378,19 +395,46 @@ const getRiskLabel = (s: number) =>
   s >= 85 ? "LOW RISK" : s >= 60 ? "MEDIUM RISK" : "HIGH RISK";
 
 export default function App() {
+  const saved = loadSession();
+
   const [activeArea, setActiveArea] = useState<Area>("ICU");
-  const [checks, setChecks] = useState<Record<string, CheckValue | undefined>>({});
-  const [auditorName, setAuditorName] = useState("");
-  const [roundDate, setRoundDate] = useState(
-    new Date().toISOString().split("T")[0]
+  const [checks, setChecks] = useState<Record<string, CheckValue | undefined>>(
+    saved?.checks ?? {}
   );
-  const [observations, setObservations] = useState<Record<string, string>>({});
+  const [auditorName, setAuditorName] = useState<string>(
+    saved?.auditorName ?? ""
+  );
+  const [roundDate, setRoundDate] = useState<string>(
+    saved?.roundDate ?? new Date().toISOString().split("T")[0]
+  );
+  const [observations, setObservations] = useState<Record<string, string>>(
+    saved?.observations ?? {}
+  );
   const [showReport, setShowReport] = useState(false);
   const [actionPlan, setActionPlan] = useState<
     Record<number, { action?: string; responsible?: string; timeline?: string }>
-  >({});
+  >(saved?.actionPlan ?? {});
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState("");
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [savedToast, setSavedToast] = useState(false);
+
+  useEffect(() => {
+    saveSession({ checks, auditorName, roundDate, observations, actionPlan });
+    setSavedToast(true);
+    const t = setTimeout(() => setSavedToast(false), 1500);
+    return () => clearTimeout(t);
+  }, [checks, auditorName, roundDate, observations, actionPlan]);
+
+  const clearSession = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setChecks({});
+    setAuditorName("");
+    setRoundDate(new Date().toISOString().split("T")[0]);
+    setObservations({});
+    setActionPlan({});
+    setShowClearConfirm(false);
+  };
 
   const key = (area: string, sec: string, idx: number) =>
     `${area}||${sec}||${idx}`;
@@ -704,6 +748,32 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
             >
               📋 Generate Report
             </button>
+            <button
+              onClick={() => setShowClearConfirm(true)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 5,
+                background: "rgba(255,255,255,0.12)",
+                color: "white",
+                border: "1px solid rgba(255,255,255,0.25)",
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+            >
+              🔄 New Round
+            </button>
+            {savedToast && (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "#2ecc71",
+                  fontWeight: "bold",
+                  opacity: 0.9,
+                }}
+              >
+                ✓ Saved
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -971,6 +1041,86 @@ ${obsList || "<p style='color:#888'>No additional observations recorded.</p>"}
           />
         </div>
       </div>
+
+      {/* NEW ROUND CONFIRM */}
+      {showClearConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 300,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: 12,
+              padding: 28,
+              maxWidth: 380,
+              width: "100%",
+              textAlign: "center",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+            }}
+          >
+            <div style={{ fontSize: 36, marginBottom: 10 }}>🔄</div>
+            <div
+              style={{
+                fontWeight: "bold",
+                fontSize: 16,
+                color: "#1a1a2e",
+                marginBottom: 8,
+              }}
+            >
+              Start a New Round?
+            </div>
+            <div
+              style={{ fontSize: 13, color: "#666", marginBottom: 22 }}
+            >
+              This will clear all current checklist entries, scores, and
+              action plan data. This action cannot be undone.
+            </div>
+            <div
+              style={{ display: "flex", gap: 10, justifyContent: "center" }}
+            >
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                style={{
+                  padding: "8px 22px",
+                  borderRadius: 6,
+                  border: "1px solid #ddd",
+                  background: "white",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: "bold",
+                  color: "#555",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={clearSession}
+                style={{
+                  padding: "8px 22px",
+                  borderRadius: 6,
+                  border: "none",
+                  background: "#e74c3c",
+                  color: "white",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: "bold",
+                }}
+              >
+                Yes, Clear & Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* REPORT MODAL */}
       {showReport && (
